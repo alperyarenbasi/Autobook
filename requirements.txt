@@ -1,0 +1,6 @@
+# Core dependencies for the AutoBook application
+playwright>=1.40.0
+python-dotenv>=1.0.0
+
+# Development dependencies (optional)
+# pytest>=7.0.0  # For testing
