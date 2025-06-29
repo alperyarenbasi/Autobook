@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test script to verify that all modules are working correctly.
 Run this to check if persistent_status.py is functioning.

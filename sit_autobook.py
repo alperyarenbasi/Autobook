@@ -5,7 +5,7 @@ from persistent_status import log_event
 
 load_dotenv()
 
-UNIT             = "ob001-201"
+UNIT             = os.getenv("SIT_UNIT") 
 UNIT_URL         = f"https://bolig.sit.no/en/unit/{UNIT}/?code=xxsitxxSITYY"
 USERNAME         = os.getenv("SIT_USER")
 PASSWORD         = os.getenv("SIT_PASS")
@@ -43,24 +43,21 @@ def safe_reload(page, wait_until="domcontentloaded"):
             time.sleep(delay)
 
 def feide_login(page):
-    """Full Feide login flow. Assumes we're on any public bolig.sit page."""
-    print("Logging in with Feide…")
+    print("Feide full login …")
     page.get_by_role("button", name="Login").click()
     page.get_by_role("button", name="Log in with Feide").click()
 
-    page.locator('input[placeholder*="Search"]').click()
-    page.locator('input[placeholder*="Search"]').fill("NTNU")
-    page.wait_for_selector('li:has-text("NTNU")', timeout=5_000)
+    search = page.locator('input[placeholder*="Search"]')
+    search.click(); search.fill("NTNU")
+    page.wait_for_selector('li:has-text("NTNU")')
     page.click('li:has-text("NTNU")')
     page.click('button:has-text("Continue")')
 
-    page.fill('input[name="feidename"]', USERNAME, timeout=5_000)
-    page.fill('input[name="password"]', PASSWORD)
+    page.fill('input[name="feidename"]', USERNAME)
+    page.fill('input[name="password"]',  PASSWORD)
     page.click('button[type="submit"]')
-
-    page.wait_for_selector('nav >> text=MyPage', timeout=10_000)
-    print("Logged in.")
-    log_event("Login", unit=UNIT, ok=True)
+    page.wait_for_selector('nav >> text=MyPage', timeout=15_000)
+    log_event("login", unit="all", ok=True)
 
 def feide_relogin(page):
     print("Logging in with Feide again...")
@@ -80,13 +77,6 @@ def feide_relogin(page):
     print("Quick re-login complete")
     log_event("re-login", unit=UNIT, ok=True)
 
-
-
-
-def clear_feide_cookies(page):
-    ctx = page.context
-    ctx.clear_cookies()   
-    print("Cleared Feide ")
 
 def is_logged_in(page):
     for _ in range(20):                 # 20 × 100 ms ≈ 2 s max
@@ -130,11 +120,11 @@ def ensure_on_right_page(page, target_url: str, goto_fn):
 
 # --------------------------------------------------------------------------- main loop
 def run_autobooker():
-    if not USERNAME or not PASSWORD or not FEIDE_DISPLAY_NAME:
-        raise RuntimeError("Set SIT_USER, SIT_PASS and FEIDE_DISPLAY_NAME in .env")
+    if not USERNAME or not PASSWORD or not FEIDE_DISPLAY_NAME or not UNIT:
+        raise RuntimeError("Set SIT_USER, SIT_PASS, FEIDE_DISPLAY_NAME and SIT_UNIT in .env")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--single-process"])
+        browser = p.chromium.launch(headless=False)
         page    = browser.new_page()
         safe_goto(page, UNIT_URL)
 
@@ -167,12 +157,9 @@ def run_autobooker():
 
         # booked!
         page.screenshot(path="booked.png")
-        print("UNIT BOOKED - sounding alarm...")
-        print("ALARM! BOOKING SUCCESSFUL!")
-        input("Type 'exit' to stop alarm: ")          # waits for the word "exit"
+        print("UNIT BOOKED")
 
         print("Ready to sign contract.")
-        input("Press Enter to close browser…")
         page.pause()
         #browser.close()    
 
@@ -183,7 +170,7 @@ def main():
     except Exception:
         tb = traceback.format_exc()
         log_event("crash", unit="n/a", ok=False, error=tb)
-        print("ALARM! ERROR OCCURRED!")
+        print("ERROR OCCURRED!")
         input("Press Enter to continue...")
         raise
 
